@@ -1,0 +1,217 @@
+# the hostname you want to use for the Pi
+hostname: k3s-master
+
+# a public key if you intend to use ssh to connect to the node. This is highly recommended since k3OS has no root user.
+ssh_authorized_keys:
+- github:CaptainStandby
+
+# Ethernet config
+write_files:
+  - path: /var/lib/connman/default.config
+    content: |-
+      [service_eth0]
+      Type=ethernet
+      MAC=dc:a6:32:b4:b1:b2
+      IPv4=192.168.188.151/255.255.255.0/192.168.188.1
+      IPv6=off
+      Nameservers=192.168.188.1,8.8.8.8,1.1.1.1
+      Timeservers=0.de.pool.ntp.org,1.de.pool.ntp.org,2.de.pool.ntp.org,3.de.pool.ntp.org
+
+  - path: /var/lib/rancher/k3s/server/manifests/metallb.yaml
+    content: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: metallb-system
+      ---
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: metallb
+        namespace: kube-system
+      spec:
+        chart: metallb
+        repo: https://metallb.github.io/metallb
+        targetNamespace: metallb-system
+        version: 0.12.1
+        valuesContent: |-
+          configInline:
+            address-pools:
+            - name: default
+              protocol: layer2
+              addresses:
+              - 192.168.188.201-192.168.188.250
+
+  - path: /var/lib/rancher/k3s/server/manifests/sealed-secrets.yaml
+    content: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: sealed-secrets
+      ---
+      apiVersion: v1
+      data:
+        tls.crt: ${SEALED_SECRET_TLS_CRT}
+        tls.key: ${SEALED_SECRET_TLS_KEY}
+      kind: Secret
+      metadata:
+        creationTimestamp: null
+        labels:
+          sealedsecrets.bitnami.com/sealed-secrets-key: active
+        name: sealed-secrets-key
+        namespace: sealed-secrets
+      type: kubernetes.io/tls
+      ---
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: sealed-secrets
+        namespace: kube-system
+      spec:
+        chart: sealed-secrets
+        repo: https://bitnami-labs.github.io/sealed-secrets
+        targetNamespace: sealed-secrets
+        version: 2.1.8
+        set:
+          namespace: sealed-secrets
+
+  - path: /var/lib/rancher/k3s/server/manifests/argocd.yaml
+    content: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: argocd
+      ---
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: argocd
+        namespace: kube-system
+      spec:
+        chart: argo-cd
+        repo: https://argoproj.github.io/argo-helm
+        targetNamespace: argocd
+        version: 4.6.0
+        valuesContent: |-
+          applicationSet:
+            enabled: false
+          server:
+            # additionalApplications:
+            # - name: root
+            #   namespace: argocd
+            #   finalizers:
+            #     - resources-finalizer.argocd.argoproj.io
+            #   project: default
+            #   source:
+            #     repoURL: https://github.com/CaptainStandby/k3s-manifests.git
+            #     targetRevision: main
+            #     path: apps
+            #     directory:
+            #       recurse: false
+            #   destination:
+            #     server: https://kubernetes.default.svc
+            #     namespace: default
+            #   syncPolicy:
+            #     automated:
+            #       prune: true
+            #       selfHeal: true
+            #       allowEmpty: true
+            #     syncOptions:
+            #       - CreateNamespace=true
+            #       - PruneLast=true
+            ingress:
+              enabled: true
+              ingressClassName: nginx
+              hosts:
+                - argocd.cluster.hlnr.de
+                - 192.168.188.151
+
+  - path: /var/lib/rancher/k3s/server/manifests/cert-manager.yaml
+    content: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: cert-manager
+      ---
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: cert-manager
+        namespace: kube-system
+      spec:
+        chart: cert-manager
+        repo: https://charts.jetstack.io
+        targetNamespace: cert-manager
+        version: v1.8.0
+        set:
+          installCRDs: 'true'
+
+  - path: /var/lib/rancher/k3s/server/manifests/nfs-subdir-external-provisioner.yaml
+    content: |-
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: nfs-subdir-external-provisioner
+        namespace: kube-system
+      spec:
+        chart: nfs-subdir-external-provisioner
+        repo: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
+        valuesContent: |-
+          nfs:
+            server: 192.168.188.59
+            path: /volume1/CLUSTERSTORAGE
+            mountOptions:
+            - nfsvers=4
+            - nolock
+          storageClass:
+            defaultClass: true
+
+  - path: /var/lib/rancher/k3s/server/manifests/ingress-nginx.yaml
+    content: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: ingress-nginx
+      ---
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: ingress-nginx
+        namespace: kube-system
+      spec:
+        chart: ingress-nginx
+        repo: https://kubernetes.github.io/ingress-nginx
+        targetNamespace: ingress-nginx
+        version: 4.1.1
+        set:
+          defaultBackend.enabled: 'false'
+
+run_cmd:
+  - curl -Lo /var/lib/rancher/k3s/server/manifests/calico.yaml https://projectcalico.docs.tigera.io/manifests/calico.yaml
+
+k3os:
+  ntp_servers:
+    - 0.de.pool.ntp.org
+    - 1.de.pool.ntp.org
+    - 2.de.pool.ntp.org
+    - 3.de.pool.ntp.org
+
+  sysctl:
+    kernel.printk: 4 4 1 7
+    kernel.kptr_restrict: '1'
+
+  dns_nameservers:
+    - 192.168.188.1
+    - 8.8.8.8
+    - 1.1.1.1
+
+  labels:
+    role: master
+
+  k3s_args:
+    - server
+    - --cluster-init
+    - --disable=local-storage,traefik,servicelb
+    - --selinux
+    - --flannel-backend=none
+    - --disable-network-policy
