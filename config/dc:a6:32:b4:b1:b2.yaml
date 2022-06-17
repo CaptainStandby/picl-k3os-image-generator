@@ -95,12 +95,44 @@ write_files:
         valuesContent: |-
           applicationSet:
             enabled: false
+          configs:
+            secret:
+              argocdServerAdminPassword: '${ARGOCD_ADMIN_PASSWORD}'
           server:
+            additionalApplications:
+            - name: root
+              namespace: argocd
+              finalizers:
+                - resources-finalizer.argocd.argoproj.io
+              project: default
+              source:
+                repoURL: https://github.com/CaptainStandby/k3s-manifests.git
+                targetRevision: main
+                path: apps
+              destination:
+                server: https://kubernetes.default.svc
+                namespace: default
+              syncPolicy:
+                automated:
+                  prune: true
+                  selfHeal: true
+                  allowEmpty: true
+                syncOptions:
+                  - CreateNamespace=true
+                  - PruneLast=true
             ingress:
               enabled: true
+              annotations:
+                nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+                nginx.ingress.kubernetes.io/ssl-passthrough: 'true'
               ingressClassName: nginx
               hosts:
                 - argocd.cluster.hlnr.de
+              https: true
+              # tls:
+              #   - secretName: argocd-tls-certificate
+              #     hosts:
+              #       - argocd.cluster.hlnr.de
 
   - path: /var/lib/rancher/k3s/server/manifests/cert-manager.yaml
     content: |-
