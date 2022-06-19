@@ -12,9 +12,9 @@ write_files:
       [service_eth0]
       Type=ethernet
       MAC=dc:a6:32:b4:b1:b2
-      IPv4=192.168.188.151/255.255.255.0/192.168.188.1
+      IPv4=10.128.1.1/255.255.0.0/10.128.0.254
       IPv6=off
-      Nameservers=192.168.188.1,8.8.8.8,1.1.1.1
+      Nameservers=10.128.0.254,8.8.8.8,1.1.1.1
       Timeservers=0.de.pool.ntp.org,1.de.pool.ntp.org,2.de.pool.ntp.org,3.de.pool.ntp.org
 
   - path: /var/lib/rancher/k3s/server/manifests/metallb.yaml
@@ -40,7 +40,7 @@ write_files:
             - name: default
               protocol: layer2
               addresses:
-              - 192.168.188.201-192.168.188.250
+              - 10.128.10.1-10.128.10.200
 
   - path: /var/lib/rancher/k3s/server/manifests/sealed-secrets.yaml
     content: |-
@@ -98,6 +98,8 @@ write_files:
           configs:
             secret:
               argocdServerAdminPassword: '${ARGOCD_ADMIN_PASSWORD}'
+          dex:
+            enabled: false
           server:
             additionalApplications:
             - name: root
@@ -108,7 +110,7 @@ write_files:
               source:
                 repoURL: https://github.com/CaptainStandby/k3s-manifests.git
                 targetRevision: main
-                path: apps
+                path: apps/
               destination:
                 server: https://kubernetes.default.svc
                 namespace: default
@@ -167,7 +169,7 @@ write_files:
         version: 4.0.16
         valuesContent: |-
           nfs:
-            server: 192.168.188.59
+            server: 10.128.0.35
             path: /volume1/CLUSTERSTORAGE
             mountOptions:
             - nfsvers=4
@@ -210,7 +212,7 @@ k3os:
     kernel.kptr_restrict: '1'
 
   dns_nameservers:
-    - 192.168.188.1
+    - 10.128.0.254
     - 8.8.8.8
     - 1.1.1.1
 
