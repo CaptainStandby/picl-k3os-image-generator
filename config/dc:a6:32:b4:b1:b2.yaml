@@ -169,7 +169,7 @@ write_files:
         version: 4.0.16
         valuesContent: |-
           nfs:
-            server: 10.128.0.35
+            server: 10.128.0.38
             path: /volume1/CLUSTERSTORAGE
             mountOptions:
             - nfsvers=4
