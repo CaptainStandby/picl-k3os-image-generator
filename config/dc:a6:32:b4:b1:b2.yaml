@@ -172,7 +172,7 @@ write_files:
             server: 10.128.0.38
             path: /volume1/CLUSTERSTORAGE
             mountOptions:
-            - nfsvers=4
+            - nfsvers=3
             - nolock
           storageClass:
             defaultClass: true
